@@ -149,7 +149,7 @@ private:
 		const Utils::MustBe<AspectRatio> pixelAspectRatio(AspectRatio(image.density().height(), image.density().width())); //Note that height comes first as a higher density means a lower pixel size
 		const Utils::MustBe<ColorPrimaries> colorPrimaries(ColorPrimaries::BT709); //TODO
 		const Utils::MustBe<ColorModel> colorModel(ColorModel::RGB); //Always RGB
-		const Utils::MustBe<ColorTransferFunction> colorTransferFunction(ColorTransferFunction::GAMMA22); //sRGB
+		const Utils::MustBe<ColorTransferFunction> colorTransferFunction(ColorTransferFunction::IEC61966_2_1); //sRGB
 		const Utils::MustBe<ColorSubsampling> colorSubsampling(ColorSubsampling::RB_444); //No subsampling
 		const Utils::MustBe<ColorRange> colorRange(ColorRange::FULL); //No need for headroom and footroom
 		Utils::Discrete<ColorFormat> colorFormats;
