@@ -2,7 +2,7 @@
  * This example shows how instantiate an output window
  * 
  * How to compile:
- * c++ 00\ -\ Instantiating.cpp -std=c++17 -Wall -Wextra -lzuazo -lzuazo-window -lzuazo-magick -lglfw -ldl -lpthread `Magick++-config --ldflags`
+ * c++ 00\ -\ Instantiating.cpp -std=c++17 -Wall -Wextra -lzuazo -lzuazo-window -lzuazo-magick -lglfw -ldl -lpthread `Magick++-config --cppflags --cxxflags --ldflags --libs`
  */
 
 #include <zuazo/Instance.h>
@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
 		std::terminate();
 	}
 
-	const std::string_view path = argv[1];
+	const std::string path = argv[1];
 
 	//Instantiate Zuazo as usual. Note that we're loading the Window module
 	Zuazo::Instance::ApplicationInfo appInfo(
@@ -33,12 +33,13 @@ int main(int argc, char** argv) {
 	Zuazo::Instance instance(std::move(appInfo));
 	std::unique_lock<Zuazo::Instance> lock(instance);
 
+	Magick::Image image(path);
 	Zuazo::Sources::Magick picture(
 		instance, 										//Instance
-		std::string(path),								//Layout name
-		Zuazo::PixelFormats::MAGICK_SOURCE_OPTIMAL_8_A	//Video mode limits
+		path,											//Layout name
+		Zuazo::PixelFormats::MAGICK_SOURCE_OPTIMAL_8_A,	//Video mode limits
+		std::move(image)
 	);
-	picture.read(path);
 	picture.open();
 
 	//Construct the desired video mode

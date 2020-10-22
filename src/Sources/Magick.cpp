@@ -5,11 +5,8 @@
 #include <zuazo/Graphics/Uploader.h>
 
 #include <algorithm>
-#include <Magick++.h>
 
 namespace Zuazo::Sources {
-
-namespace MagickAPI = ::Magick;
 
 /*
  * MagickImpl
@@ -30,7 +27,7 @@ struct MagickImpl {
 			uploader = Graphics::Uploader(uploader.getVulkan(), conf);
 		}
 
-		Zuazo::Video flush(MagickAPI::Image& image) const {
+		Zuazo::Video flush(::Magick::Image& image) const {
 			const auto result = uploader.acquireFrame();
 			assert(result);
 
@@ -43,7 +40,7 @@ struct MagickImpl {
 			//Copy from the image to the frame
 			assert(pixelData.size() == 1);
 			assert(map != "");
-			assert(storageType != MagickAPI::StorageType::UndefinedPixel);
+			assert(storageType != ::Magick::StorageType::UndefinedPixel);
 			image.write(
 				0, 0,								//Copy area start position
 				resolution.width, resolution.height,//Copy area size
@@ -62,14 +59,15 @@ struct MagickImpl {
 
 	std::reference_wrapper<Magick> 		owner;
 
-	mutable MagickAPI::Image			image;
+	::Magick::Image						image;
 
 	Output								videoOut;
 
 	std::unique_ptr<Open>				opened;
 
-	MagickImpl(Magick& magick)
+	MagickImpl(Magick& magick, ::Magick::Image image)
 		: owner(magick)
+		, image(std::move(image))
 	{
 	}
 
@@ -134,13 +132,19 @@ struct MagickImpl {
 		}
 	}
 
-	void read(std::string_view path) {
-		image.read(std::string(path));
+
+
+	::Magick::Image& getImage() {
+		return image;
+	}
+
+	const ::Magick::Image& getImage() const {
+		return image;
 	}
 
 private:
 	static std::vector<VideoMode> createVideoModeCompatibility(	const Instance& instance, 
-																const MagickAPI::Image& image )
+																const ::Magick::Image& image )
 	{
 		std::vector<VideoMode> result;
 
@@ -186,8 +190,9 @@ private:
 
 Magick::Magick(	Instance& instance, 
 						std::string name, 
-						VideoMode videoMode )
-	: Utils::Pimpl<MagickImpl>({}, *this)
+						VideoMode videoMode,
+						::Magick::Image image )
+	: Utils::Pimpl<MagickImpl>({}, *this, std::move(image))
 	, ZuazoBase(instance, 
 				std::move(name),
 				{},
@@ -210,8 +215,12 @@ Magick& Magick::operator=(Magick&& other) = default;
 
 
 
-void Magick::read(std::string_view path) {
-	(*this)->read(path);
+::Magick::Image& Magick::getImage() {
+	return (*this)->getImage();
+}
+
+const ::Magick::Image& Magick::getImage() const {
+	return (*this)->getImage();
 }
 	
 }

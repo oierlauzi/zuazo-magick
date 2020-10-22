@@ -5,7 +5,9 @@
 #include <zuazo/Video.h>
 #include <zuazo/Signal/SourceLayout.h>
 
-#include <string_view>
+#include <string>
+#include <Magick++.h>
+
 
 namespace Zuazo::Sources {
 
@@ -20,7 +22,8 @@ class Magick
 public:
 	Magick(	Instance& instance, 
 			std::string name, 
-			VideoMode videoMode = VideoMode::ANY);
+			VideoMode videoMode = VideoMode::ANY,
+			::Magick::Image image = {} );
 
 	Magick(const Magick& other) = delete;
 	Magick(Magick&& other);
@@ -30,8 +33,9 @@ public:
 	Magick& 				operator=(Magick&& other);
 
 	using ZuazoBase::update;
-
-	void					read(std::string_view path);
+	
+	::Magick::Image&		getImage();
+	const ::Magick::Image&	getImage() const;
 
 };
 	
