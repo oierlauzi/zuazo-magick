@@ -63,6 +63,7 @@ int main(int argc, char** argv) {
 		Zuazo::Math::Vec2i(1280, 720),	//Window size (in screen coordinates)
 		Zuazo::Consumers::Window::NO_MONITOR //No monitor
 	);
+	window.setScalingMode(Zuazo::ScalingMode::BOXED);
 
 	//Open the window (now becomes visible)
 	window.open();
