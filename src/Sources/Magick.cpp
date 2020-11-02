@@ -158,8 +158,8 @@ private:
 		const Utils::MustBe<ColorRange> colorRange(ColorRange::FULL); //No need for headroom and footroom
 		Utils::Discrete<ColorFormat> colorFormats;
 
-		//Check for support
-		for(const auto& format : instance.getFormatSupport().inputFormats) {
+		const auto uploaderFormatSupport = Graphics::Uploader::getSupportedFormats(instance.getVulkan());
+		for(const auto& format : uploaderFormatSupport) {
 			if(toMagick(format) != toMagick(ColorFormat::NONE)) {
 				colorFormats.push_back(format);
 			}
