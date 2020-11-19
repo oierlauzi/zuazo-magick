@@ -41,6 +41,7 @@ int main(int argc, char** argv) {
 		std::move(image)
 	);
 	picture.open();
+	picture.update();
 
 	//Construct the desired video mode
 	const Zuazo::VideoMode videoMode(
@@ -70,7 +71,7 @@ int main(int argc, char** argv) {
 
 	window << picture;
 
-	std::cout << "Video-mode support: " << picture.getVideoModeCompatibility().front() << std::endl;
+	std::cout << "Video-mode support: " << picture.getVideoMode() << std::endl;
 
 	//Done!
 	lock.unlock();

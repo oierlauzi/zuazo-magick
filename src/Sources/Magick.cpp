@@ -82,18 +82,15 @@ struct MagickImpl {
 		auto& magick = static_cast<Magick&>(base);
 		assert(&owner.get() == &magick);
 
-		//Open it
-		opened = Utils::makeUnique<Open>(
-			magick.getInstance().getVulkan(),
-			magick.getVideoMode() ? magick.getVideoMode().getFrameDescriptor() : Graphics::Frame::Descriptor()
-		);
-
-		//Upload the current image
-		update();
+		if(magick.getVideoMode()) {
+			opened = Utils::makeUnique<Open>(
+				magick.getInstance().getVulkan(),
+				magick.getVideoMode().getFrameDescriptor()
+			);
+		}
 	}
 
 	void close(ZuazoBase& base) {
-		assert(opened);
 		auto& magick = static_cast<Magick&>(base);
 		assert(&owner.get() == &magick);
 
@@ -104,19 +101,17 @@ struct MagickImpl {
 	void update() {
 		auto& magick = owner.get();
 
-		//Set videomode compatibility
-		magick.setVideoModeCompatibility(createVideoModeCompatibility(
-			magick.getInstance(),
-			image
-		));
+		//Update the videomode compatibility
+		magick.setVideoModeCompatibility(
+			createVideoModeCompatibility(magick.getInstance().getVulkan(), image)
+		);
 
 		//Refresh the output if needed
 		if(opened) {
-			if(magick.getVideoMode()) {
-				videoOut.push(opened->flush(image));
-			} else {
-				videoOut.reset();
-			}
+			assert(magick.getVideoMode());
+			videoOut.push(opened->flush(image));
+		} else {
+			videoOut.reset();
 		}
 	}
 
@@ -125,14 +120,24 @@ struct MagickImpl {
 		assert(&owner.get() == &magick);
 
 		//Update uploader
-		if(opened) {
-			opened->recreate(
-				videoMode ? videoMode.getFrameDescriptor() : Graphics::Frame::Descriptor()
-			);
+		if(magick.isOpen()) {
+			const auto isValid = static_cast<bool>(videoMode);
+
+			if(opened && isValid) {
+				//VideoMode remains valid
+				opened->recreate(videoMode.getFrameDescriptor());
+			} else if(opened && !isValid) {
+				//VideoMode has become invalid
+				opened.reset();
+			} else if(!opened && isValid) {
+				//VideoMode has become valid
+				opened = Utils::makeUnique<Open>(
+					magick.getInstance().getVulkan(),
+					videoMode.getFrameDescriptor()
+				);
+			}
 		}
 	}
-
-
 
 	::Magick::Image& getImage() {
 		return image;
@@ -143,7 +148,7 @@ struct MagickImpl {
 	}
 
 private:
-	static std::vector<VideoMode> createVideoModeCompatibility(	const Instance& instance, 
+	static std::vector<VideoMode> createVideoModeCompatibility(	const Graphics::Vulkan& vulkan, 
 																const ::Magick::Image& image )
 	{
 		std::vector<VideoMode> result;
@@ -158,7 +163,7 @@ private:
 		const Utils::MustBe<ColorRange> colorRange(ColorRange::FULL); //No need for headroom and footroom
 		Utils::Discrete<ColorFormat> colorFormats;
 
-		const auto uploaderFormatSupport = Graphics::Uploader::getSupportedFormats(instance.getVulkan());
+		const auto uploaderFormatSupport = Graphics::Uploader::getSupportedFormats(vulkan);
 		for(const auto& format : uploaderFormatSupport) {
 			if(toMagick(format) != toMagick(ColorFormat::NONE)) {
 				colorFormats.push_back(format);
