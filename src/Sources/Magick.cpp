@@ -16,15 +16,15 @@ struct MagickImpl {
 	struct Open {
 		Graphics::Uploader					uploader;
 		
-		Open(const Graphics::Vulkan& vulkan, const Graphics::Frame::Descriptor& conf) 
-			: uploader(vulkan, conf)
+		Open(const Graphics::Vulkan& vulkan, const Graphics::Frame::Descriptor& frameDesc, const Chromaticities& cromaticities) 
+			: uploader(vulkan, frameDesc, cromaticities)
 		{
 		}
 
 		~Open() = default;
 
-		void recreate(const Graphics::Frame::Descriptor& conf) {
-			uploader = Graphics::Uploader(uploader.getVulkan(), conf);
+		void recreate(const Graphics::Frame::Descriptor& frameDesc, const Chromaticities& cromaticities) {
+			uploader = Graphics::Uploader(uploader.getVulkan(), frameDesc, cromaticities);
 		}
 
 		Zuazo::Video flush(::Magick::Image& image) const {
@@ -85,7 +85,8 @@ struct MagickImpl {
 		if(magick.getVideoMode()) {
 			opened = Utils::makeUnique<Open>(
 				magick.getInstance().getVulkan(),
-				magick.getVideoMode().getFrameDescriptor()
+				magick.getVideoMode().getFrameDescriptor(),
+				getChromaticities(image)
 			);
 		}
 	}
@@ -125,7 +126,10 @@ struct MagickImpl {
 
 			if(opened && isValid) {
 				//VideoMode remains valid
-				opened->recreate(videoMode.getFrameDescriptor());
+				opened->recreate(
+					videoMode.getFrameDescriptor(),
+					getChromaticities(image)					
+				);
 			} else if(opened && !isValid) {
 				//VideoMode has become invalid
 				opened.reset();
@@ -133,7 +137,8 @@ struct MagickImpl {
 				//VideoMode has become valid
 				opened = Utils::makeUnique<Open>(
 					magick.getInstance().getVulkan(),
-					videoMode.getFrameDescriptor()
+					videoMode.getFrameDescriptor(),
+					getChromaticities(image)
 				);
 			}
 		}
@@ -156,7 +161,7 @@ private:
 		const Utils::MustBe<Rate> frameRate(Rate(0, 1)); //Static, 0 Hz
 		const Utils::MustBe<Resolution> resolution(Resolution(image.columns(), image.rows()));
 		const Utils::MustBe<AspectRatio> pixelAspectRatio(AspectRatio(image.density().height(), image.density().width())); //Note that height comes first as a higher density means a lower pixel size
-		const Utils::MustBe<ColorPrimaries> colorPrimaries(ColorPrimaries::BT709); //TODO
+		const Utils::MustBe<ColorPrimaries> colorPrimaries(ColorPrimaries::BT709); //This will be ignored if color primaries are defined
 		const Utils::MustBe<ColorModel> colorModel(ColorModel::RGB); //Always RGB
 		const Utils::MustBe<ColorTransferFunction> colorTransferFunction(ColorTransferFunction::IEC61966_2_1); //sRGB
 		const Utils::MustBe<ColorSubsampling> colorSubsampling(ColorSubsampling::RB_444); //No subsampling

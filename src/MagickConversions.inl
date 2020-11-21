@@ -82,4 +82,24 @@ constexpr std::tuple<std::string_view, Magick::StorageType> toMagick(ColorFormat
 	}
 }
 
+inline Chromaticities getChromaticities(const Magick::Image& image) {
+	//Get the primaries from the image
+	double 	red_x, red_y,
+			green_x, green_y,
+			blue_x, blue_y,
+			white_x, white_y;
+
+	image.chromaRedPrimary(&red_x, &red_y);
+	image.chromaGreenPrimary(&green_x, &green_y);
+	image.chromaBluePrimary(&blue_x, &blue_y);
+	image.chromaWhitePoint(&white_x, &white_y);
+
+	return Chromaticities(
+		Math::Vec2f(red_x, red_y),
+		Math::Vec2f(green_x, green_y),
+		Math::Vec2f(blue_x, blue_y),
+		Math::Vec2f(white_x, white_y)
+	);
+}
+
 }
