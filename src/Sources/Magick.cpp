@@ -32,10 +32,10 @@ struct MagickImpl {
 			assert(result);
 
 			const auto& pixelData = result->getPixelData();
-			const auto& resolution = result->getDescriptor().resolution;
+			const auto& resolution = result->getDescriptor().getResolution();
 
 			//Decide the format
-			const auto [map, storageType] = toMagick(result->getDescriptor().colorFormat);
+			const auto [map, storageType] = toMagick(result->getDescriptor().getColorFormat());
 
 			//Copy from the image to the frame
 			assert(pixelData.size() == 1);

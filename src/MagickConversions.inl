@@ -98,7 +98,8 @@ inline Chromaticities getChromaticities(const Magick::Image& image) {
 		Math::Vec2f(red_x, red_y),
 		Math::Vec2f(green_x, green_y),
 		Math::Vec2f(blue_x, blue_y),
-		Math::Vec2f(white_x, white_y)
+		Math::Vec2f(white_x, white_y),
+		80.0f //TODO this is sRGB. What if AdobeRGB?
 	);
 }
 
