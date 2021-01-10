@@ -78,9 +78,9 @@ struct MagickImpl {
 	}
 
 	void open(ZuazoBase& base) {
-		assert(!opened);
 		auto& magick = static_cast<Magick&>(base);
 		assert(&owner.get() == &magick);
+		assert(!opened);
 
 		if(magick.getVideoMode()) {
 			opened = Utils::makeUnique<Open>(
@@ -91,12 +91,53 @@ struct MagickImpl {
 		}
 	}
 
+	void asyncOpen(ZuazoBase& base, std::unique_lock<Instance>& lock) {
+		auto& magick = static_cast<Magick&>(base);
+		assert(&owner.get() == &magick);
+		assert(!opened);
+		assert(lock.owns_lock());
+
+		if(magick.getVideoMode()) {
+			lock.unlock();
+			auto newOpened = Utils::makeUnique<Open>(
+				magick.getInstance().getVulkan(),
+				magick.getVideoMode().getFrameDescriptor(),
+				getChromaticities(image)
+			);
+			lock.lock();
+
+			opened = std::move(newOpened);
+		}
+
+		assert(lock.owns_lock());
+	}
+
 	void close(ZuazoBase& base) {
 		auto& magick = static_cast<Magick&>(base);
 		assert(&owner.get() == &magick);
 
 		videoOut.reset();
 		opened.reset();
+
+		assert(!opened);
+	}
+
+	void asyncClose(ZuazoBase& base, std::unique_lock<Instance>& lock) {
+		auto& magick = static_cast<Magick&>(base);
+		assert(&owner.get() == &magick);
+		assert(lock.owns_lock());
+
+		videoOut.reset();
+		auto oldOpened = std::move(opened);
+
+		if(oldOpened) {
+			lock.unlock();
+			oldOpened.reset();
+			lock.lock();
+		}
+
+		assert(!opened);
+		assert(lock.owns_lock());
 	}
 
 	void update() {
@@ -208,7 +249,9 @@ Magick::Magick(	Instance& instance,
 				{},
 				std::bind(&MagickImpl::moved, std::ref(**this), std::placeholders::_1),
 				std::bind(&MagickImpl::open, std::ref(**this), std::placeholders::_1),
+				std::bind(&MagickImpl::asyncOpen, std::ref(**this), std::placeholders::_1, std::placeholders::_2),
 				std::bind(&MagickImpl::close, std::ref(**this), std::placeholders::_1),
+				std::bind(&MagickImpl::asyncClose, std::ref(**this), std::placeholders::_1, std::placeholders::_2),
 				std::bind(&MagickImpl::update, std::ref(**this)) )
 	, VideoBase(
 		std::move(videoMode),
