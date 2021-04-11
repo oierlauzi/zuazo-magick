@@ -22,8 +22,7 @@ class Magick
 public:
 	Magick(	Instance& instance, 
 			std::string name, 
-			VideoMode videoMode = VideoMode::ANY,
-			::Magick::Image image = {} );
+			::Magick::Image image );
 
 	Magick(const Magick& other) = delete;
 	Magick(Magick&& other);

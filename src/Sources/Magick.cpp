@@ -241,7 +241,6 @@ private:
 
 Magick::Magick(	Instance& instance, 
 						std::string name, 
-						VideoMode videoMode,
 						::Magick::Image image )
 	: Utils::Pimpl<MagickImpl>({}, *this, std::move(image))
 	, ZuazoBase(instance, 
@@ -254,7 +253,6 @@ Magick::Magick(	Instance& instance,
 				std::bind(&MagickImpl::asyncClose, std::ref(**this), std::placeholders::_1, std::placeholders::_2),
 				std::bind(&MagickImpl::update, std::ref(**this)) )
 	, VideoBase(
-		std::move(videoMode),
 		std::bind(&MagickImpl::videoModeCallback, std::ref(**this), std::placeholders::_1, std::placeholders::_2) )
 	, Signal::SourceLayout<Video>(makeProxy((*this)->videoOut))
 {
