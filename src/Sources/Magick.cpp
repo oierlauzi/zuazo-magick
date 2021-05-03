@@ -2,7 +2,7 @@
 
 #include "../MagickConversions.h"
 
-#include <zuazo/Graphics/Uploader.h>
+#include <zuazo/Graphics/StagedFramePool.h>
 
 #include <algorithm>
 
@@ -14,28 +14,28 @@ namespace Zuazo::Sources {
 
 struct MagickImpl {
 	struct Open {
-		Graphics::Uploader					uploader;
+		Graphics::StagedFramePool				framePool;
 		
-		Open(const Graphics::Vulkan& vulkan, const Graphics::Frame::Descriptor& frameDesc, const Chromaticities& cromaticities) 
-			: uploader(vulkan, frameDesc, cromaticities)
+		Open(const Graphics::Vulkan& vulkan, const Graphics::Frame::Descriptor& frameDesc) 
+			: framePool(vulkan, frameDesc)
 		{
 		}
 
 		~Open() = default;
 
-		void recreate(const Graphics::Frame::Descriptor& frameDesc, const Chromaticities& cromaticities) {
-			uploader = Graphics::Uploader(uploader.getVulkan(), frameDesc, cromaticities);
+		void recreate(const Graphics::Frame::Descriptor& frameDesc) {
+			framePool = Graphics::StagedFramePool(framePool.getVulkan(), frameDesc);
 		}
 
 		Zuazo::Video flush(::Magick::Image& image) const {
-			const auto result = uploader.acquireFrame();
+			const auto result = framePool.acquireFrame();
 			assert(result);
 
 			const auto& pixelData = result->getPixelData();
-			const auto& resolution = result->getDescriptor().getResolution();
+			const auto& resolution = result->getDescriptor()->getResolution();
 
 			//Decide the format
-			const auto [map, storageType] = toMagick(result->getDescriptor().getColorFormat());
+			const auto [map, storageType] = toMagick(result->getDescriptor()->getColorFormat());
 
 			//Copy from the image to the frame
 			assert(pixelData.size() == 1);
@@ -77,66 +77,53 @@ struct MagickImpl {
 		owner = static_cast<Magick&>(base);
 	}
 
-	void open(ZuazoBase& base) {
+	void open(ZuazoBase& base, std::unique_lock<Instance>* lock = nullptr) {
 		auto& magick = static_cast<Magick&>(base);
 		assert(&owner.get() == &magick);
 		assert(!opened);
 
-		if(magick.getVideoMode()) {
-			opened = Utils::makeUnique<Open>(
+		const auto& videoMode = magick.getVideoMode();
+		if(videoMode) {
+			//Open it in a unlocked environment
+			if(lock) lock->unlock();
+			auto newOpened = Utils::makeUnique<Open>(
 				magick.getInstance().getVulkan(),
-				magick.getVideoMode().getFrameDescriptor(),
-				getChromaticities(image)
+				videoMode.getFrameDescriptor()
 			);
+			if(lock) lock->lock();
+
+			//Write the changes while locked
+			opened = std::move(newOpened);
 		}
 	}
 
 	void asyncOpen(ZuazoBase& base, std::unique_lock<Instance>& lock) {
-		auto& magick = static_cast<Magick&>(base);
-		assert(&owner.get() == &magick);
-		assert(!opened);
 		assert(lock.owns_lock());
-
-		if(magick.getVideoMode()) {
-			lock.unlock();
-			auto newOpened = Utils::makeUnique<Open>(
-				magick.getInstance().getVulkan(),
-				magick.getVideoMode().getFrameDescriptor(),
-				getChromaticities(image)
-			);
-			lock.lock();
-
-			opened = std::move(newOpened);
-		}
-
+		open(base, &lock);
 		assert(lock.owns_lock());
 	}
 
-	void close(ZuazoBase& base) {
+	void close(ZuazoBase& base, std::unique_lock<Instance>* lock = nullptr) {
 		auto& magick = static_cast<Magick&>(base);
 		assert(&owner.get() == &magick);
 
+		//Perform changes while locked
 		videoOut.reset();
-		opened.reset();
+		auto oldOpened = std::move(opened);
+
+		if(oldOpened) {
+			//Destroy it in a unlocked environment
+			if(lock) lock->unlock();
+			oldOpened.reset();
+			if(lock) lock->lock();
+		}
 
 		assert(!opened);
 	}
 
 	void asyncClose(ZuazoBase& base, std::unique_lock<Instance>& lock) {
-		auto& magick = static_cast<Magick&>(base);
-		assert(&owner.get() == &magick);
 		assert(lock.owns_lock());
-
-		videoOut.reset();
-		auto oldOpened = std::move(opened);
-
-		if(oldOpened) {
-			lock.unlock();
-			oldOpened.reset();
-			lock.lock();
-		}
-
-		assert(!opened);
+		close(base, &lock);
 		assert(lock.owns_lock());
 	}
 
@@ -168,8 +155,7 @@ struct MagickImpl {
 			if(opened && isValid) {
 				//VideoMode remains valid
 				opened->recreate(
-					videoMode.getFrameDescriptor(),
-					getChromaticities(image)					
+					videoMode.getFrameDescriptor()					
 				);
 			} else if(opened && !isValid) {
 				//VideoMode has become invalid
@@ -178,8 +164,7 @@ struct MagickImpl {
 				//VideoMode has become valid
 				opened = Utils::makeUnique<Open>(
 					magick.getInstance().getVulkan(),
-					videoMode.getFrameDescriptor(),
-					getChromaticities(image)
+					videoMode.getFrameDescriptor()
 				);
 			}
 		}
@@ -209,7 +194,7 @@ private:
 		const Utils::MustBe<ColorRange> colorRange(ColorRange::FULL); //No need for headroom and footroom
 		Utils::Discrete<ColorFormat> colorFormats;
 
-		const auto uploaderFormatSupport = Graphics::Uploader::getSupportedFormats(vulkan);
+		const auto uploaderFormatSupport = Graphics::StagedFrame::getSupportedFormats(vulkan);
 		for(const auto& format : uploaderFormatSupport) {
 			if(toMagick(format) != toMagick(ColorFormat::NONE)) {
 				colorFormats.push_back(format);
@@ -247,9 +232,9 @@ Magick::Magick(	Instance& instance,
 				std::move(name),
 				{},
 				std::bind(&MagickImpl::moved, std::ref(**this), std::placeholders::_1),
-				std::bind(&MagickImpl::open, std::ref(**this), std::placeholders::_1),
+				std::bind(&MagickImpl::open, std::ref(**this), std::placeholders::_1, nullptr),
 				std::bind(&MagickImpl::asyncOpen, std::ref(**this), std::placeholders::_1, std::placeholders::_2),
-				std::bind(&MagickImpl::close, std::ref(**this), std::placeholders::_1),
+				std::bind(&MagickImpl::close, std::ref(**this), std::placeholders::_1, nullptr),
 				std::bind(&MagickImpl::asyncClose, std::ref(**this), std::placeholders::_1, std::placeholders::_2),
 				std::bind(&MagickImpl::update, std::ref(**this)) )
 	, VideoBase(
