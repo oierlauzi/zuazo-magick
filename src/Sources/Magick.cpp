@@ -59,14 +59,15 @@ struct MagickImpl {
 
 	std::reference_wrapper<Magick> 		owner;
 
-	::Magick::Image						image;
-
 	Output								videoOut;
+
+	::Magick::Image						image;
 
 	std::unique_ptr<Open>				opened;
 
 	MagickImpl(Magick& magick, ::Magick::Image image)
 		: owner(magick)
+		, videoOut(magick, std::string(Signal::makeOutputName<Video>()))
 		, image(std::move(image))
 	{
 	}
@@ -75,6 +76,7 @@ struct MagickImpl {
 
 	void moved(ZuazoBase& base) {
 		owner = static_cast<Magick&>(base);
+		videoOut.setLayout(base);
 	}
 
 	void open(ZuazoBase& base, std::unique_lock<Instance>* lock = nullptr) {
@@ -239,7 +241,7 @@ Magick::Magick(	Instance& instance,
 				std::bind(&MagickImpl::update, std::ref(**this)) )
 	, VideoBase(
 		std::bind(&MagickImpl::videoModeCallback, std::ref(**this), std::placeholders::_1, std::placeholders::_2) )
-	, Signal::SourceLayout<Video>(makeProxy((*this)->videoOut))
+	, Signal::SourceLayout<Video>((*this)->videoOut.getProxy())
 {
 }
 
