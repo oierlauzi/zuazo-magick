@@ -189,16 +189,16 @@ private:
 		const Utils::MustBe<Rate> frameRate(Rate(0, 1)); //Static, 0 Hz
 		const Utils::MustBe<Resolution> resolution(Resolution(image.columns(), image.rows()));
 		const Utils::MustBe<AspectRatio> pixelAspectRatio(AspectRatio(image.density().height(), image.density().width())); //Note that height comes first as a higher density means a lower pixel size
-		const Utils::MustBe<ColorPrimaries> colorPrimaries(ColorPrimaries::BT709); //This will be ignored if color primaries are defined
-		const Utils::MustBe<ColorModel> colorModel(ColorModel::RGB); //Always RGB
-		const Utils::MustBe<ColorTransferFunction> colorTransferFunction(ColorTransferFunction::IEC61966_2_1); //sRGB
-		const Utils::MustBe<ColorSubsampling> colorSubsampling(ColorSubsampling::RB_444); //No subsampling
-		const Utils::MustBe<ColorRange> colorRange(ColorRange::FULL); //No need for headroom and footroom
+		const Utils::MustBe<ColorPrimaries> colorPrimaries(ColorPrimaries::bt709); //This will be ignored if color primaries are defined
+		const Utils::MustBe<ColorModel> colorModel(ColorModel::rgb); //Always RGB
+		const Utils::MustBe<ColorTransferFunction> colorTransferFunction(ColorTransferFunction::iec61966_2_1); //sRGB
+		const Utils::MustBe<ColorSubsampling> colorSubsampling(ColorSubsampling::rb444); //No subsampling
+		const Utils::MustBe<ColorRange> colorRange(ColorRange::full); //No need for headroom and footroom
 		Utils::Discrete<ColorFormat> colorFormats;
 
 		const auto uploaderFormatSupport = Graphics::StagedFrame::getSupportedFormats(vulkan);
 		for(const auto& format : uploaderFormatSupport) {
-			if(toMagick(format) != toMagick(ColorFormat::NONE)) {
+			if(toMagick(format) != toMagick(ColorFormat::none)) {
 				colorFormats.push_back(format);
 			}
 		}
